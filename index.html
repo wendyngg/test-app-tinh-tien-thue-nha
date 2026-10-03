@@ -104,14 +104,14 @@ button:disabled{opacity:.65;cursor:wait}
 </div>
 
 <script>
-// Đường link Web app của Google Apps Script
-const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbyM-mv08gJe3RaWy_OVbvORR2vRITCF4yk9p3QRnJk1CLrjUBiT9vkS8iJ8GKwguriEkg/exec";
+// Link Web app Google Apps Script của bạn
+const WEB_APP_URL = "https://google.com";
 
 const $ = id => document.getElementById(id);
 const num = id => parseFloat($(id).value) || 0;
 const money = n => new Intl.NumberFormat("vi-VN").format(Math.round(n)) + "đ";
 const qty = n => new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 2 }).format(n);
-const esc = s => s.replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const esc = s => s.replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "'" }[c]));
 
 // Mặc định tháng hiện tại
 (function () {
@@ -131,7 +131,7 @@ function updateUsage() {
 }
 ["dien_cu", "dien_moi", "nuoc_cu", "nuoc_moi"].forEach(id => $(id).addEventListener("input", updateUsage));
 
-// Kiểm tra dữ liệu và tính tiền; trả về null nếu có lỗi
+// Kiểm tra dữ liệu và tính tiền
 function compute() {
   const msg = $("msg"); msg.textContent = "";
   const fail = t => { msg.textContent = t; return null; };
@@ -148,75 +148,61 @@ function compute() {
   if (soNuoc < 0) return fail("Số nước mới phải lớn hơn hoặc bằng số nước cũ.");
   if ([num("gia_dien"), num("gia_nuoc"), num("tien_phong"), num("dich_vu")].some(v => v < 0)) return fail("Các khoản tiền không được âm.");
 
-  const b = {
-    phong, nguoi: $("nguoi").value.trim(), thang,
-    dienCu: num("dien_cu"), dienMoi: num("dien_moi"), soDien,
-    nuocCu: num("nuoc_cu"), nuocMoi: num("nuoc_moi"), soNuoc,
-    giaDien: num("gia_dien"), giaNuoc: num("gia_nuoc"),
-    tienPhong: num("tien_phong"), dichVu: num("dich_vu")
+  const tienDien = soDien * num("gia_dien");
+  const tienNuoc = soNuoc * num("gia_nuoc");
+  const tienPhong = num("tien_phong");
+  const dichVu = num("dich_vu");
+  const tongTien = tienDien + tienNuoc + tienPhong + dichVu;
+
+  return {
+    tenPhong: phong + " - " + $("nguoi").value.trim(),
+    thang: thang,
+    dienCu: num("dien_cu"),
+    dienMoi: num("dien_moi"),
+    nuocCu: num("nuoc_cu"),
+    nuocMoi: num("nuoc_moi"),
+    tienPhong: tienPhong,
+    tongTien: tongTien,
+    html: `
+      <div class="line"><span>Phòng / Người thuê</span><b>${esc(phong)} ${$("nguoi").value ? `(${esc($("nguoi").value)})` : ''}</b></div>
+      <div class="line"><span>Tháng</span><b>${esc(thang)}</b></div>
+      <div class="line"><span>Tiền phòng cố định</span><b>${money(tienPhong)}</b></div>
+      <div class="line"><span>Tiền điện <small>${qty(soDien)} kWh × ${money(num("gia_dien"))}</small></span><b>${money(tienDien)}</b></div>
+      <div class="line"><span>Tiền nước <small>${qty(soNuoc)} khối × ${money(num("gia_nuoc"))}</small></span><b>${money(tienNuoc)}</b></div>
+      ${dichVu > 0 ? `<div class="line"><span>Dịch vụ khác</span><b>${money(dichVu)}</b></div>` : ''}
+      <div class="total"><span>Tổng cộng</span><strong>${money(tongTien)}</strong></div>
+    `
   };
-  b.tienDien = soDien * b.giaDien;
-  b.tienNuoc = soNuoc * b.giaNuoc;
-  b.tong = b.tienPhong + b.dichVu + b.tienDien + b.tienNuoc;
-  return b;
 }
 
-function render(b) {
-  const row = (t, sub, v) => `<div class="line"><div>${t}${sub ? `<small>${sub}</small>` : ""}</div><b>${money(v)}</b></div>`;
-  $("receipt").innerHTML =
-    `<p style="margin:0 0 6px"><b>Phòng ${esc(b.phong)}</b>${b.nguoi ? " - " + esc(b.nguoi) : ""}<br><span class="empty">Tháng ${esc(b.thang)}</span></p>` +
-    row("Tiền phòng", "", b.tienPhong) +
-    row("Dịch vụ khác", "", b.dichVu) +
-    row("Tiền điện", `${qty(b.soDien)} kWh x ${money(b.giaDien)}`, b.tienDien) +
-    row("Tiền nước", `${qty(b.soNuoc)} khối x ${money(b.giaNuoc)}`, b.tienNuoc) +
-    `<div class="total"><span>Tổng cộng</span><strong>${money(b.tong)}</strong></div>`;
-}
+$("calc").addEventListener("click", () => {
+  const res = compute();
+  if (res) $("receipt").innerHTML = res.html;
+});
 
-$("calc").addEventListener("click", () => { const b = compute(); if (b) render(b); });
-
-async function save() {
-  const b = compute();
-  if (!b) return;
-  render(b);
-
-  const payload = {
-    phong: b.phong,
-    nguoi_thue: b.nguoi,
-    thang: b.thang,
-    so_dien_cu: b.dienCu, so_dien_moi: b.dienMoi, so_dien_tieu_thu: b.soDien,
-    so_nuoc_cu: b.nuocCu, so_nuoc_moi: b.nuocMoi, so_nuoc_tieu_thu: b.soNuoc,
-    don_gia_dien: b.giaDien, don_gia_nuoc: b.giaNuoc,
-    tien_phong: b.tienPhong, tien_dich_vu: b.dichVu,
-    tien_dien: b.tienDien, tien_nuoc: b.tienNuoc,
-    tong_tien: b.tong,
-    ngay_gio_luu: new Date().toLocaleString("vi-VN"),
-    // Các trường dưới đây khớp với script Apps Script đã tạo trước đó
-    tien_thue: b.tienPhong + b.dichVu,
-    ghi_chu: `Điện ${qty(b.soDien)} kWh; Nước ${qty(b.soNuoc)} khối; Dịch vụ khác ${b.dichVu}đ`
-  };
+// Gửi dữ liệu đồng bộ sang Google Sheets
+$("save").addEventListener("click", async () => {
+  const res = compute();
+  if (!res) return;
 
   const btn = $("save");
+  const msg = $("msg");
   btn.disabled = true;
   btn.textContent = "Đang lưu...";
+  msg.textContent = "";
+
+  // Tạo object đóng gói chính xác các cột Tiếng Việt không dấu
+  const payload = {
+    ngayLuu: new Date().toLocaleString("vi-VN"),
+    tenPhong: res.tenPhong,
+    thang: res.thang,
+    dienCu: res.dienCu,
+    dienMoi: res.dienMoi,
+    nuocCu: res.nuocCu,
+    nuocMoi: res.nuocMoi,
+    tienPhong: res.tienPhong,
+    tongTien: res.tongTien
+  };
+
   try {
-    // no-cors: trình duyệt vẫn gửi dữ liệu đi nhưng không cho đọc phản hồi (opaque response).
-    // Vì vậy chỉ bắt được lỗi mạng; không biết script bên Google có ghi thành công hay không.
-    await fetch(WEB_APP_URL, {
-      method: "POST",
-      mode: "no-cors",
-      headers: { "Content-Type": "text/plain;charset=utf-8" },
-      body: JSON.stringify(payload)
-    });
-    alert("Lưu thành công!");
-  } catch (err) {
-    console.error(err);
-    alert("Lỗi lưu dữ liệu!");
-  } finally {
-    btn.disabled = false;
-    btn.textContent = "Lưu hóa đơn";
-  }
-}
-$("save").addEventListener("click", save);
-</script>
-</body>
-</html>
+    const response = await fetch(WEB_APP_URL, {

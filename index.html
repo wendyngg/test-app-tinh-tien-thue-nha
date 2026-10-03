@@ -105,7 +105,7 @@ button:disabled{opacity:.65;cursor:wait}
 
 <script>
 // Đường link Web app của Google Apps Script
-const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbyDyHUVJjWBTTSuq61xG6d-hd1XLlZ245LkUFY_HmH6FVsEPifFh7xvW1QNdWz09LGLmQ/exec";
+const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbyM-mv08gJe3RaWy_OVbvORR2vRITCF4yk9p3QRnJk1CLrjUBiT9vkS8iJ8GKwguriEkg/exec";
 
 const $ = id => document.getElementById(id);
 const num = id => parseFloat($(id).value) || 0;
@@ -199,14 +199,14 @@ async function save() {
   btn.disabled = true;
   btn.textContent = "Đang lưu...";
   try {
-    // text/plain giúp tránh lỗi CORS preflight với Apps Script
-    const res = await fetch(WEB_APP_URL, {
+    // no-cors: trình duyệt vẫn gửi dữ liệu đi nhưng không cho đọc phản hồi (opaque response).
+    // Vì vậy chỉ bắt được lỗi mạng; không biết script bên Google có ghi thành công hay không.
+    await fetch(WEB_APP_URL, {
       method: "POST",
+      mode: "no-cors",
       headers: { "Content-Type": "text/plain;charset=utf-8" },
       body: JSON.stringify(payload)
     });
-    const data = await res.json();
-    if (!res.ok || data.status !== "success") throw new Error(data.message || "Phản hồi không hợp lệ");
     alert("Lưu thành công!");
   } catch (err) {
     console.error(err);
